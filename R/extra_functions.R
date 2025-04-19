@@ -1,27 +1,17 @@
 ## extra functions
 
-
 data_processing <- function(df){
-  df<-as.data.frame(df)
-  df$sanitation<-as.numeric(df$sanitation)
-  df$illiteracy<-as.numeric(df$illiteracy)
-  df$income<-as.numeric(df$income)
-  df$spei1[is.infinite(df$spei1)==T]<-NA
-  df$spei6[is.infinite(df$spei6)==T]<-NA
-  df$spei12[is.infinite(df$spei12)==T]<-NA
-  df$spei3[is.infinite(df$spei3)==T]<-NA
-  
   # filter out municipalities with no local transmission
-  df %>% 
-    select(MUNICIP, CASES, YEAR)%>%
-    group_by(MUNICIP, YEAR) %>%
-    summarise(CASES=sum(CASES)) %>% 
+  df |> 
+    select(MUNICIP, CASES, YEAR)|>
+    group_by(MUNICIP, YEAR) |>
+    summarise(CASES=sum(CASES)) |> 
     mutate(bin=ifelse(CASES>=5,1,0), # continuous low level transmission
-           bin2=ifelse(CASES>20,1,0)) %>% # atleast one year with many cases
-    group_by(MUNICIP) %>%
-    summarise(years_n=sum(bin), years_n2=sum(bin2))%>%
+           bin2=ifelse(CASES>20,1,0)) |> # at least one year with many cases
+    group_by(MUNICIP) |>
+    summarise(years_n=sum(bin), years_n2=sum(bin2))|>
     filter(years_n==5|years_n2>=1)-> df2
-  df %>% 
+  df |> 
     filter(MUNICIP %in% unique(df2$MUNICIP)==T)-> df
   
   return(df)
@@ -51,10 +41,39 @@ run_baseline <- function(data, GRAPH){
   
 }
 
+select_variables <- function(data, type="all"){
+  
+variables <- c("ALPHA","DEGREE","BETWEEN","income","illiteracy","sanitation",
+              "spei1","spei3","spei6","spei12","ENSO_anom","mir_pop",
+               "cum_rain","cum_rain_1","cum_rain_2","cum_rain_3","cum_rain_01","cum_rain_02",
+               "cum_rain_03","mean_rain","mean_rain_1","mean_rain_2","mean_rain_3","mean_rain_01",
+               "mean_rain_02","mean_rain_03","min_temp","mean_temp","max_temp","min_hum",
+              "mean_hum","max_hum","min_temp_1","mean_temp_1","max_temp_1","min_hum_1",
+               "mean_hum_1","max_hum_1","min_temp_2","mean_temp_2","max_temp_2","min_hum_2",
+               "mean_hum_2","max_hum_2","min_temp_3","mean_temp_3","max_temp_3","min_hum_3",
+               "mean_hum_3","max_hum_3","mean_temp_01","mean_temp_02","mean_temp_03","min_temp_01",
+               "min_temp_02","min_temp_03","max_temp_01","max_temp_02","max_temp_03","mean_hum_01",
+               "mean_hum_02","mean_hum_03","min_hum_01","min_hum_02","min_hum_03","max_hum_01",
+               "max_hum_02","max_hum_03","max_max_temp","max_max_hum","max_max_temp_1","max_max_hum_1",
+               "max_max_temp_2","max_max_hum_2","max_max_temp_3","max_max_hum_3","max_max_temp_01","max_max_temp_02",
+               "max_max_temp_03","max_max_hum_01","max_max_hum_02","max_max_hum_03","min_min_temp","min_min_hum",
+               "min_min_temp_1","min_min_hum_1","min_min_temp_2","min_min_hum_2","min_min_temp_3","min_min_hum_3",
+               "min_min_temp_01","min_min_temp_02","min_min_temp_03","min_min_hum_01","min_min_hum_02","min_min_hum_03",
+               "temp_range_day","temp_range_day_1","temp_range_day_2","temp_range_day_3","temp_range_day_01","temp_range_day_02",
+               "temp_range_day_03","raindays","heavy_raindays","v_heavy_raindays","raindays_1","heavy_raindays_1",
+               "v_heavy_raindays_1","raindays_2","heavy_raindays_2","v_heavy_raindays_2","raindays_3","heavy_raindays_3",
+              "v_heavy_raindays_3","rain_days_01","rain_days_02","rain_days_03","heavy_raindays_01","heavy_raindays_02",
+               "heavy_raindays_03","v_heavy_raindays_01","v_heavy_raindays_02","v_heavy_raindays_03","cons_rainday","cons_dryday",
+               "cons_rainday_1","cons_dryday_1","cons_rainday_2","cons_dryday_2","cons_rainday_3","cons_dryday_3")
+if(type=="temperature") variables <- variables[c(27:29, 33:35, 39:41,45:47,51:59,69,71,73,75,77:79, 83,85,87,89,91:93,97:103)]
+if(type=="subset") variables <- variables[c(8,11,27)] 
+return(variables)  
+}
+
 
 process_univar_names <- function(res){
   
-  res %>% mutate(group=var) %>%
+  res |> mutate(group=var) |>
     mutate(group=case_when(
       var == "ENSO_anom" ~ "ENSO",
       var == "ALPHA" | var == "DEGREE" |var == "BETWEEN"  ~ "mobility",
@@ -87,21 +106,21 @@ process_univar_results_for_plot <- function(){
 
 a<-b<-c<-NULL
 
-if(file.exists("outputs/univar/chikv_univar_all.RDS")==T){
+if(file.exists("outputs/univar/chikv_univar_all.RDS")){
 a<-readRDS("outputs/univar/chikv_univar_all.RDS")
 a$path<-"chikv"
 a<-a[order(a$waic),]
 a$ORDER<-1:nrow(a)
 }
 
-if(file.exists("outputs/univar/denv_univar_all.RDS")==T){
+if(file.exists("outputs/univar/denv_univar_all.RDS")){
 b<-readRDS("outputs/univar/denv_univar_all.RDS")
 b$path<-"denv"
 b<-b[order(b$waic),]
 b$ORDER<-1:nrow(b)
-  }
+}
   
-if(file.exists("outputs/univar/zikv_univar_all.RDS")==T){
+if(file.exists("outputs/univar/zikv_univar_all.RDS")){
 c<-readRDS("outputs/univar/zikv_univar_all.RDS")
 c$path<-"zikv"
 c<-c[order(c$waic),]
@@ -253,6 +272,3 @@ data$path <-toupper(data$path)
 
 return(data)
 }
-
-
-

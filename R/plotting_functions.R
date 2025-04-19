@@ -1,18 +1,19 @@
 ### plotting functions
 
 
-## data visulisation
+## data visualisation
 
 ## temporal heterogeneity - average cases per week number per state
 temporal_cases_state <- function(){
 list<-list()
 for(i in 1:3){
   path<-unique(c("zikv","chikv", "denv"))[i]
-  df<-readRDS(paste0("data/", path,"_timeseries.RDS"))
-  df<-as.data.frame(df)
-  df %>% select(STATE,WEEK_NO,CASES,YEAR) %>% 
-    group_by(STATE,WEEK_NO) %>%
-    summarise(cases_50 = mean((CASES))) -> df
+  df<-readRDS(paste0("data/", path,"_exp_resid.RDS"))
+  df |> mutate(Inc = ((CASES+1e-05)/pop)*100000) -> df
+  df |> select(STATE,WEEK_NO,CASES,YEAR, Inc) |> 
+    group_by(STATE,WEEK_NO) |>
+    reframe(Inc = mean((Inc)),
+            cases_50 = mean((CASES))) -> df
   df$path <- path
   list[[i]]<-df
   remove("df")
@@ -25,20 +26,21 @@ combo <- combo[combo$WEEK_NO<53,]
 
 week_RE<-ggplot(combo) + facet_geo(facets = "STATE", 
                                    grid = br_states_grid1,scales="free")+
-  geom_line(aes(x = WEEK_NO, y = log(cases_50), col = path), linewidth=1) +
+  geom_line(aes(x = WEEK_NO, y = log(Inc), col = path), linewidth=1) +
   xlab("\nWeek number\n") +
-  ylab("Log(mean cases)") +
+  ylab("Log(Incidence)") +
   scale_y_continuous(breaks=scales::breaks_pretty(n=4))+
-  scale_x_continuous(breaks=seq(from=1,to=53, by=16))+
+  scale_x_continuous(breaks=seq(from=1,to=53, by=10), labels=seq(from=1,to=53, by=10))+
   theme(legend.position = c(0.8,0.1),
         panel.background = element_rect(fill = NA), 
         legend.title = element_blank(),
-        legend.text = element_text(size=15),
+        legend.text = element_text(size=20),
         legend.key  = element_blank(),
         panel.border = element_blank(),
-        axis.text.x=element_text(size=8),
-        axis.text.y=element_text(size=8),
-        axis.title =element_text(size=15),
+        axis.text.x=element_text(size=10),
+        axis.text.y=element_text(size=10),
+        axis.title =element_text(size=20),
+        strip.text = element_text(size=12),
         strip.background = element_blank())
 
 return(week_RE)
@@ -52,33 +54,31 @@ list<-list()
 for(i in 1:3){
   path<-unique(c("zikv","chikv", "denv"))[i]
   
-  df<-readRDS(paste0("data/", path,"_timeseries.RDS"))
-  df<-as.data.frame(df)
+  df<-readRDS(paste0("data/", path,"_exp_resid.RDS"))
+  df |> mutate(Inc = ((CASES+1e-05)/pop)*100000) -> df
   
-  head(df)
-  df %>% select(MUNICIP,CASES) %>% 
-    group_by(MUNICIP) %>%
-    summarise(cases_50 = mean((CASES))) -> df
-  df
-  df$path <- path
+  df |> select(STATE,MUNICIP,WEEK_NO,CASES,YEAR, Inc) |>
+    group_by(MUNICIP) |>
+    reframe(Inc = mean((Inc)),
+            cases_50 = mean((CASES))) -> df
+  
+  df$path <- toupper(path)
   list[[i]]<-df
   remove("df")
 }
 combo <- bind_rows(list)
-combo[combo$cases_50==0,]
 
-combo$cases_50<-log(combo$cases_50)
+combo$loginc<-log(combo$Inc)
 space <- left_join(shapefile, combo, by = c("code_muni" = "MUNICIP"))
 space<-space[is.na(space$path)==F,]
-space$path <-toupper(space$path)
 
 space <- ggplot() + facet_wrap("path",ncol=2)+
-  geom_sf(data = space, aes(fill = cases_50),
+  geom_sf(data = space, aes(fill = loginc),
           lwd = 0, color = NA) +
   scale_fill_distiller(palette = "RdYlBu",
                        direction = -1
   ) +
-  labs(fill="Log(mean cases)", col="") +
+  labs(fill="Log(Incidence)", col="") +
   theme_void() +
   theme(strip.text = element_text(size=15),
         legend.title =  element_text(size=12),
@@ -99,13 +99,11 @@ heatmaps <- function(shapefile = shapefile, pathogen = "denv"){
     warning("pathogen must be chikv, denv, or zikv")
   }
   
-  
-  df<-readRDS(paste0("data/", pathogen,"_timeseries.RDS"))
-  df<-as.data.frame(df)
+  df<-readRDS(paste0("data/", pathogen,"_exp_resid.RDS"))
   geom <- data.frame(MUNICIP=shapefile$code_muni, GEOM=1:length(unique(shapefile$code_muni)))
-  df %>% left_join(geom)-> df
+  df |> left_join(geom)-> df
   df$WEEK <- (paste0(df$YEAR,"-W",sprintf("%02d",(df$WEEK_NO)),"-1"))
-  df %>% select(MUNICIP, WEEK, CASES, pop, GEOM, YEAR) %>% mutate(Inc = ((CASES+1e-05)/pop)*100000) -> df
+  df |> select(MUNICIP, WEEK, CASES, pop, GEOM, YEAR) |> mutate(Inc = ((CASES+1e-05)/pop)*100000) -> df
   
   y <- shapefile$code_muni
   z <- shapefile$name_muni
@@ -126,7 +124,7 @@ heatmaps <- function(shapefile = shapefile, pathogen = "denv"){
   zD <- merge(y, df, by = "MUNICIP", all.x = F, all.y = F)
     zD <- zD[order(zD$x), ]# ordering geographically
     zD$MUNICIP<-as.character(zD$MUNICIP)
-    zD <- zD %>%
+    zD <- zD |>
       mutate(MUNICIP = fct_reorder(MUNICIP, desc(x))) 
   
     min_year<-min(zD$YEAR)
@@ -137,12 +135,13 @@ plot <-
   geom_tile()+
   labs(title = toupper(pathogen),
        fill = "Log(Incidence)",
-       x= NULL,
-       y=NULL) +
+       x = NULL,
+       y = "Municipality") +
   theme(axis.text.x = element_text(angle=90, hjust=1, size=10),
         axis.text.y = element_blank(),
-        legend.position = "none",
         axis.ticks.y = element_blank(),
+        legend.position = "bottom",
+        legend.key.width = unit(1.2, 'cm'),
         panel.background = element_rect(fill = NA), 
         panel.border = element_rect(colour = "black", fill=NA),
         plot.title = element_text(hjust = 0.5, size=15),
@@ -152,7 +151,10 @@ plot <-
                        na.value="white" ,
                        guide = "colourbar",
                        limits =c(-18.4,9))+
-  scale_x_date(date_breaks="1 year",date_labels = "%Y") 
+  scale_x_date(date_breaks="1 year",date_labels = "%Y") +
+  guides(fill=guide_colourbar(title.position="top",
+                              title.hjust=0.5,
+                              barwidth=8)) 
 
 return(plot)
 }
@@ -199,7 +201,7 @@ plotting_RE_week_number<-function(model, data, pathogen){
 }
 
 ## plotting multivariable model random effects - spatial 
-plotting_RE_municip<-function(model,data,shapefile){
+plotting_RE_municip <- function(model,data,shapefile){
   
   FILTER<-unique(data$MUNICIP)
   
@@ -214,11 +216,11 @@ plotting_RE_municip<-function(model,data,shapefile){
   # Add the map geometry to the space dataframe
   space <- left_join(shapefile, space, by = c("code_muni" = "micro_code"))
   
-  space %>% mutate(mean=ifelse(code_muni%in%FILTER, mean, NA))->space
+  space |> mutate(mean=ifelse(code_muni%in%FILTER, mean, NA))->space
   
   space_effects <- ggplot() + 
     geom_sf(data = space, aes(fill = mean), lwd = 0, color = NA) +
-    scale_fill_distiller(palette = "RdYlBu",#"RdPu",#"Spectral", 
+    scale_fill_distiller(palette = "RdYlBu",
                          na.value="lightgrey",
                          direction = -1) +
     labs(fill="", col="",title =paste0(toupper(pathogen), "\n \n")) +
@@ -232,7 +234,7 @@ plotting_RE_municip<-function(model,data,shapefile){
 
 
 ## plotting model fit
-plot_model_fit <- function(data, pathogen,nsamp, samples, level="national"){
+plot_model_fit <- function(data, pathogen, nsamp, samples, level="national"){
   
   data$date <- ISOweek2date(paste0(data$YEAR,"-W",sprintf("%02d", data$WEEK_NO),"-1"))
   
@@ -242,17 +244,17 @@ plot_model_fit <- function(data, pathogen,nsamp, samples, level="national"){
   for(n in 1:nsamp){
     new<-data
     new$est_new<-NA
-    new$est_new<-samples[,n] 
+    new$est_new<-exp(samples[,n]) 
     
-    new %>% select(date, MUNICIP, STATE, CASES, YEAR, WEEK_NO, pop, est_new)%>%
-      group_by(date) %>%
-      summarise(est_new = (sum(est_new)/sum(pop))*100000)->new
+    new |> select(date, MUNICIP, STATE, CASES, YEAR, WEEK_NO, pop, est_new)|>
+      group_by(date) |>
+      summarise(est_new = (sum(est_new)/sum(pop))*100000, .groups="keep")->new
     store[,n]<-new$est_new
   }
   
-  data %>% select(date,MUNICIP, STATE, CASES, YEAR, WEEK_NO, pop)%>%
-    group_by(date) %>%
-    summarise(CASES=(sum(CASES)/sum(pop))*100000)->df_nat
+  data |> select(date, MUNICIP, STATE, CASES, YEAR, WEEK_NO, pop)|>
+    group_by(date) |>
+    summarise(CASES=(sum(CASES)/sum(pop))*100000, .groups="keep") -> df_nat
   
   df_nat$median <- apply(store, 1, median)
   df_nat$lci <- apply(store, 1, quantile, probs = c(0.025))
@@ -280,19 +282,19 @@ plot_model_fit <- function(data, pathogen,nsamp, samples, level="national"){
   }
   
   if(level=="state"){
-    data %>% select(date,MUNICIP, STATE, CASES, YEAR, WEEK_NO, pop)%>%
-      group_by(date, STATE) %>%
-      summarise(CASES=(sum(CASES)/sum(pop))*100000)->df_st
+    data |> select(date,MUNICIP, STATE, CASES, YEAR, WEEK_NO, pop)|>
+      group_by(date, STATE) |>
+      summarise(CASES=(sum(CASES)/sum(pop))*100000, .groups="keep") -> df_st
     
     store2<-matrix(NA, nrow(df_st), nsamp)
     for(n in 1:nsamp){
       new<-data
       new$est_new<-NA
-      new$est_new<-samples[,n] 
+      new$est_new<-exp(samples[,n]) 
       
-      new %>% select(date,MUNICIP, STATE, CASES, YEAR, WEEK_NO, pop, est_new)%>%
-        group_by(date, STATE) %>%
-        summarise(est_new = (sum(est_new)/sum(pop))*100000)->new
+      new |> select(date,MUNICIP, STATE, CASES, YEAR, WEEK_NO, pop, est_new)|>
+        group_by(date, STATE) |>
+        summarise(est_new = (sum(est_new)/sum(pop))*100000, .groups="keep") -> new
       store2[,n]<-new$est_new
       
     }
@@ -332,18 +334,18 @@ plot_model_fit <- function(data, pathogen,nsamp, samples, level="national"){
 
 
 ## plotting model error
-plot_map_MAE<-function(data,model, pathogen, shapefile){
+plot_map_MAE <- function(data, model, pathogen, shapefile){
   
   
   data$estimate<-exp(model$summary.linear.predictor$'0.5quant')
   data$estimate_low<-exp(model$summary.linear.predictor$'0.025quant')
   data$estimate_upp<-exp(model$summary.linear.predictor$'0.975quant')
     
-  data %>% select(MUNICIP, STATE, CASES, YEAR, WEEK_NO, pop, estimate)%>%
+  data |> select(MUNICIP, STATE, CASES, YEAR, WEEK_NO, pop, estimate)|>
       mutate(CASES=(CASES/pop)*100000,
-             estimate= (estimate/pop)*100000)%>%
-      mutate(error = abs((CASES - estimate))) %>% 
-      group_by(MUNICIP) %>% 
+             estimate= (estimate/pop)*100000)|>
+      mutate(error = abs((CASES - estimate))) |> 
+      group_by(MUNICIP) |> 
       summarise(error_t = sum(error)/n()) -> d
     
     ## error map
@@ -367,87 +369,3 @@ plot_map_MAE<-function(data,model, pathogen, shapefile){
  
   return(A)
 }
-
-
-## plotting multivariate versus univariate model fit
-compare_model_fit <- function(nsamp, path,
-                              samples_uni=NULL,
-                              samples_multivariate, years="all"){
-  
-  ## data
-  df <- readRDS(paste0("data/", path,"_timeseries.RDS"))
-    
-    if(years=="all"){
-      df <- df %>% filter(YEAR>=2016) %>% data_processing()
-    }
-    if(years=="single"){ # to run a shorter example
-      df <- df %>% filter(YEAR==2016) %>% data_processing()  
-    }
-    
-    
-    df$date <- ISOweek2date(paste0(df$YEAR,"-W",sprintf("%02d", df$WEEK_NO),"-1"))
-    
-    store_final<-store_multivar<-matrix(NA, length(unique(df$date)), nsamp)
-    
-    for(n in 1:nsamp){
-      new_df<-new_df_mult<-df
-      new_df$est_final<-samples_uni[,n] 
-      if(path=="zikv"){
-        new_df_mult$est_multivar<-samples_multivariate[[3]][,n] 
-      }
-      if(path=="chikv"){
-        new_df_mult$est_multivar<-samples_multivariate[[2]][,n] 
-      }
-      if(path=="denv"){
-        new_df_mult$est_multivar<-samples_multivariate[[1]][,n] 
-      }
-    
-      new_df_mult %>% select(date,MUNICIP, STATE, CASES, YEAR, WEEK_NO, pop, est_multivar)%>%
-        group_by(date) %>%
-        summarise(est_multivar = (sum(est_multivar)/sum(pop))*100000)->new_df_mult
-      
-      new_df %>% select(date,MUNICIP, STATE, CASES, YEAR, WEEK_NO, pop, est_final)%>%
-        group_by(date) %>%
-        summarise(est_final = (sum(est_final)/sum(pop))*100000)->new_df
-      
-      store_final[,n]<-new_df$est_final
-      store_multivar[,n]<-new_df_mult$est_multivar
-   
-  }
-    
-    df %>% select(date,MUNICIP, STATE, CASES, YEAR, WEEK_NO, pop)%>%
-      group_by(date) %>%
-      summarise(CASES=(sum(CASES)/sum(pop))*100000)->df_nat
-    
-    df_nat$median_fin <- apply(store_final, 1, median)
-    df_nat$lci_fin <- apply(store_final, 1, quantile, probs = c(0.025))
-    df_nat$uci_fin <- apply(store_final, 1, quantile, probs = c(0.975))
-    
-    df_nat$median_multi <- apply(store_multivar, 1, median)
-    df_nat$lci_multi <- apply(store_multivar, 1, quantile, probs = c(0.025))
-    df_nat$uci_multi <- apply(store_multivar, 1, quantile, probs = c(0.975))
-    
-    plot<-ggplot(df_nat)+ 
-            geom_ribbon(aes(x = date, ymin = (lci_multi), ymax = (uci_multi)), 
-                        fill = "navy", alpha = 0.5) + 
-            geom_line(aes(x = date, y = (median_fin), col = "#D37295")) +
-            geom_line(aes(x = date, y = (median_multi), col = "navy")) +
-            geom_ribbon(aes(x = date, ymin = (lci_fin), ymax = (uci_fin)), 
-                        fill = "#D37295", alpha = 0.5) + 
-          geom_line(aes(x = date, y = (CASES), col = "black"),linewidth=0.8,linetype="dashed") +
-            xlab("Time") +
-            ylab("Incidence per 100000") +
-            scale_colour_identity(name = "",
-                                  breaks = c("navy", "#D37295"),
-                                  labels = c("Multivariate model", "Univariate model"),
-                                  guide = "legend") +
-            theme_bw() + 
-            theme(axis.text = element_text(size = 12), 
-                  legend.position = "bottom",
-                  legend.text = element_text(size = 15),
-                  strip.text = element_text(size = 15),
-                  axis.title = element_text(size =15))
-  
-  return(plot)
-}
-

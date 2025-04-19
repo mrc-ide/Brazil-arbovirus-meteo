@@ -40,8 +40,7 @@ run_univar_analysis <- function(data, variables, save_progress=TRUE, pathogen){
                         control.compute = list(waic = TRUE),
                         control.inla=list(int.strategy = "eb"), 
                         verbose = F,
-                        safe=T, 
-                        inla.mode = "experimental")
+                        safe=T)
     
     waic<- models[[i]]$waic$waic
     beta<-models[[i]]$summary.fixed[3,]
@@ -197,6 +196,3 @@ plot_univar_betas <- function(choice = "temperature"){
     return(plot2)
   }
   }
-  
-  
-  

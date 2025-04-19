@@ -8,7 +8,7 @@ collinarity_check<-function(data,all_variables, variable_chosen){
   sub1 <- m.cor[,colnames(m.cor)==var] #subset just the chosen variable
   test_df1 <- data.frame(names = all_variables,
                          values = sub1)
-  remove<-test_df1[which(test_df1$values>0.6 | test_df1$values < -0.6),1] #names of the variables colinear not to be included in next round
+  remove<-test_df1[which(test_df1$values>0.6 | test_df1$values < -0.6),1] # names of the variables colinear not to be included in next round
   
   return(remove)
 }
@@ -140,8 +140,7 @@ run_multivar_analysis <- function(data,GRAPH, variables_to_try, variables_chosen
                         control.compute = list(waic = TRUE),
                         control.inla=list(int.strategy = "eb"), 
                         verbose = F,
-                        safe=T, 
-                        inla.mode = "experimental")
+                        safe=T)
     
     waic<- models[[i]]$waic$waic
     beta<-models[[i]]$summary.fixed[3+stage,]
@@ -165,7 +164,7 @@ run_multivar_analysis <- function(data,GRAPH, variables_to_try, variables_chosen
   }
   
   # choose the best fitting
-  result %>% filter(beta_low < 0 & beta_upp <0 | beta_low > 0 & beta_upp >0)->sig
+  result |> filter(beta_low < 0 & beta_upp <0 | beta_low > 0 & beta_upp >0)->sig
   sig$var[sig$waic==min(sig$waic)] ->var
   waic<-sig$waic[sig$var==var]
   
@@ -219,18 +218,15 @@ return(model)
 }
 
 
-
 #### sampling
-sampling_models <- function(model, data_s, nsamp){
+sampling_models <- function(model, index, nsamp=100){
   
   samples_x=inla.posterior.sample(nsamp,model)
-  f2 <- matrix(NA, nrow(data_s), nsamp)
-  xx.s <- inla.posterior.sample.eval(function(...) c(Predictor[1:(nrow(data_s))]), samples_x)
+  f2 <- matrix(NA, length(index), nsamp)
+  xx.s <- inla.posterior.sample.eval(function(...) c(Predictor[1:(length(index))]), samples_x)
   for(i in 1:nsamp){
     f2[,i] = (xx.s[, i])
   }
   
   return(f2)
 }
-
-
