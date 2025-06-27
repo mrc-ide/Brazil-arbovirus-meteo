@@ -5,7 +5,7 @@
 ##############################################
 
 # The code here recreates the analysis in the paper. 
-# Data must first be downloaded from XXXX and saved in the data folder in this repository
+# Data must first be downloaded from zenodo and saved in the data folder in this repository
 
 ## load packages
 library(INLA)
@@ -62,9 +62,9 @@ data_tot <- data_tot |>
             data_processing()  
 
 ## run model 
-    ## note that the models take a long time to run
-    ## beep will sound when this step is finished
-baseline <- run_baseline(data=data_tot,GRAPH=GRAPH)
+    # note that the models take a long time to run
+    # beep will sound when this step is finished
+baseline <- run_baseline(data=data_tot, GRAPH=GRAPH)
 beep()
 
 ## save model
@@ -84,7 +84,7 @@ testing_variables <- select_variables(data_tot, "subset")
 
 ## run univariable models
   # the models take a long time to run without HPC 
-  # for testing - run for Zika (smaller dataset) and use only a subset of variables 
+  # for testing - run for Zika because it is a smaller dataset, and use only a subset of variables 
 dir.create("outputs/univar")
 dir.create("outputs/univar/temp")
 univar_results_table <- run_univar_analysis(data=data_tot, 
@@ -300,8 +300,8 @@ plot_map_MAE(data=data_tot, model=final_model, pathogen=pathogen, shapefile=shap
 ########################## Sensitivity analysis ####################################
 ####################################################################################
 
-response<-"exp_resid" 
-      # response must be report, exp_report, resid, or exp_resid - main analysis uses exp_resid
+response <-"exp_resid" 
+      # response must be report, exp_report, resid, or exp_resid - main analysis used exp_resid
       # report = municipality where a case was reported
       # resid = municipality where the person reporting a case lives
       # exp_report = municipality where a case was suspected infected (where this information is available), and otherwise report
