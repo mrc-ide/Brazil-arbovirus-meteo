@@ -107,8 +107,10 @@ best_univariable_result <- best_univar(univar_results_table_full) # returns vari
 best_univariable_result
 
 ## plot univariable model betas 
-plot_univar_betas(choice = "non_temperature")
-
+plot_univar_betas(choice = "temperature")
+plot_univar_betas(choice = "humidity")
+plot_univar_betas(choice = "rain")
+plot_univar_betas(choice = "socioeconomic")
 
 
 ####################################################################################
@@ -266,8 +268,7 @@ dir.create("outputs/multivar/temp")
 ############# run multivariable analysis - final models ##############
 
 # run final multivariable model
-final_model<- run_final_model(data=data_tot, graph=GRAPH, pathogen=pathogen) 
-      # this function includes the variables from the paper
+final_model<- run_final_model(data=data_tot, graph=GRAPH, pathogen=pathogen) # this function includes the variables chosen in the models from the paper
 beep()
 summary(final_model)
 
