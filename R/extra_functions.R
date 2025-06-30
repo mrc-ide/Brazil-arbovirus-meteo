@@ -44,7 +44,7 @@ run_baseline <- function(data, GRAPH){
 select_variables <- function(data, type="all"){
   
 variables <- readRDS("data/variables.RDS")
-if(type=="temperature") variables <- variables[c(27:29, 33:35, 39:41,45:47,51:59,69,71,73,75,77:79, 83,85,87,89,91:93,97:103)]
+if(type=="temperature") variables <- variables[(str_detect(variables,"Tmin") | str_detect(variables,"Tmax") | str_detect(variables,"TR"))]
 if(type=="subset") variables <- variables[c(8,11,27)] 
 return(variables)
 

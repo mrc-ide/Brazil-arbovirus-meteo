@@ -1,8 +1,8 @@
 ## multivariable model - functions for forward selection variable choice 
 
 ## test collinearity
-collinarity_check<-function(data, all_variables, variable_chosen){
-  
+collinarity_check <- function(data, all_variables, variable_chosen){
+  all_variables <- all_variables[!str_detect(all_variables,"flood")]
   m.cor <- abs(cor(data[,all_variables],use="complete.obs",method="pearson"))
   var <- variable_chosen
   sub1 <- m.cor[,colnames(m.cor)==var] #subset just the chosen variable
