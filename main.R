@@ -5,7 +5,7 @@
 ##############################################
 
 # The code here recreates the analysis in the paper. 
-# Data must first be downloaded from zenodo and saved in the data folder in this repository
+# Data must first be downloaded from zenodo and saved in the data folder in this repository.
 
 ## load packages
 library(INLA)
@@ -21,6 +21,7 @@ library(ggpubr)
 library(ggrepel)
 library(beepr)
 library(sjPlot)
+library(stringr)
 
 ## source functions
 source("R/plotting_functions.R")
@@ -40,13 +41,13 @@ GRAPH <- "data/Brazil2.graph"
 ####################################################################################
 
 ## temporal heterogeneity - average cases per week number per state
-temporal_cases_state()
+temporal_cases_state(data_type = "exp_resid")
 
 ## spatial heterogeneity - average cases per municipality
-spatial_cases_municip()
+spatial_cases_municip(data_type = "exp_resid")
 
 ## spatiotemporal heterogeneity - heatmaps per pathogen
-heatmaps(shapefile = shapefile, pathogen = "zikv")
+heatmaps(shapefile = shapefile, pathogen = "zikv", data_type = "exp_resid")
 
 
 ####################################################################################
@@ -55,16 +56,18 @@ heatmaps(shapefile = shapefile, pathogen = "zikv")
 
 ## choose the pathogen (zikv, chikv, denv)
 pathogen <- "zikv"
+## choose data type (exp_resid, exp_report, resid, report which specify how the municipality is assigned - see README)
+data_type <- "exp_resid"
 
 ## read in data
-data_tot <- readRDS(paste0("data/", pathogen, "_exp_resid.RDS"))
+data_tot <- readRDS(paste0("data/", pathogen, "_", data_type, ".RDS"))
 data_tot <- data_tot |> 
             data_processing()  
 
 ## run model 
     # note that the models take a long time to run
     # beep will sound when this step is finished
-baseline <- run_baseline(data=data_tot, GRAPH=GRAPH)
+baseline <- run_baseline(data = data_tot, GRAPH = GRAPH)
 beep()
 
 ## save model
@@ -104,7 +107,7 @@ best_univariable_result <- best_univar(univar_results_table_full) # returns vari
 best_univariable_result
 
 ## plot univariable model betas 
-plot_univar_betas(choice="non_temperature")
+plot_univar_betas(choice = "non_temperature")
 
 
 
@@ -125,7 +128,7 @@ dir.create("outputs/multivar/temp")
       # run step 1 of forward selection process
         # note - these steps will be slow 
         # suggest splitting step_variables into parallel runs
-      step1 <- run_multivar_analysis(data=data_tot,GRAPH=GRAPH, variables_to_try = step_variables, 
+      step1 <- run_multivar_analysis(data = data_tot, GRAPH = GRAPH, variables_to_try = step_variables, 
                                    variables_chosen_already = best_univariable_result[[1]], stage = 1)
       beep()
       
@@ -135,7 +138,7 @@ dir.create("outputs/multivar/temp")
       #### stage 2
       
       # remove variables collinear with best variable from step 1
-      to_remove<-collinarity_check(data_tot, all_variables, variable_chosen = step1[[1]])
+      to_remove <- collinarity_check(data_tot, all_variables, variable_chosen = step1[[1]])
       step_variables <- step_variables[!step_variables %in% to_remove]
       
       # run step 2 of forward selection process
@@ -150,7 +153,7 @@ dir.create("outputs/multivar/temp")
       #### stage 3
       
       # remove variables collinear with best variable from step 2
-      to_remove<-collinarity_check(data_tot, all_variables, variable_chosen = step2[[1]])
+      to_remove <- collinarity_check(data_tot, all_variables, variable_chosen = step2[[1]])
       step_variables <- step_variables[!step_variables %in% to_remove]
       
       # run step 3 of forward selection process
@@ -165,7 +168,7 @@ dir.create("outputs/multivar/temp")
       #### stage 4
       
       # remove variables collinear with best variable from step 3
-      to_remove<-collinarity_check(data_tot, all_variables, variable_chosen = step3[[1]])
+      to_remove <- collinarity_check(data_tot, all_variables, variable_chosen = step3[[1]])
       step_variables <- step_variables[!step_variables %in% to_remove]
       
       # run step 4 of forward selection process
@@ -180,7 +183,7 @@ dir.create("outputs/multivar/temp")
       #### stage 5
       
       # remove variables collinear with best variable from step 4
-      to_remove<-collinarity_check(data_tot, all_variables, variable_chosen = step4[[1]])
+      to_remove <- collinarity_check(data_tot, all_variables, variable_chosen = step4[[1]])
       step_variables <- step_variables[!step_variables %in% to_remove]
       
       # run step 5 of forward selection process
@@ -195,7 +198,7 @@ dir.create("outputs/multivar/temp")
       #### stage 6
       
       # remove variables collinear with best variable from step 5
-      to_remove<-collinarity_check(data_tot, all_variables, variable_chosen = step5[[1]])
+      to_remove <- collinarity_check(data_tot, all_variables, variable_chosen = step5[[1]])
       step_variables <- step_variables[!step_variables %in% to_remove]
       
       # run step 6 of forward selection process
@@ -211,7 +214,7 @@ dir.create("outputs/multivar/temp")
       #### stage 7
       
       # remove variables collinear with best variable from step 6
-      to_remove<-collinarity_check(data_tot, all_variables, variable_chosen = step6[[1]])
+      to_remove <- collinarity_check(data_tot, all_variables, variable_chosen = step6[[1]])
       step_variables <- step_variables[!step_variables %in% to_remove]
       
       # run step 7 of forward selection process
@@ -227,7 +230,7 @@ dir.create("outputs/multivar/temp")
       #### stage 8
       
       # remove variables collinear with best variable from step 7
-      to_remove<-collinarity_check(data_tot, all_variables, variable_chosen = step7[[1]])
+      to_remove <- collinarity_check(data_tot, all_variables, variable_chosen = step7[[1]])
       step_variables <- step_variables[!step_variables %in% to_remove]
       
       # run step 8 of forward selection process
@@ -244,7 +247,7 @@ dir.create("outputs/multivar/temp")
       #### stage 9
       
       # remove variables collinear with best variable from step 8
-      to_remove<-collinarity_check(data_tot, all_variables, variable_chosen = step8[[1]])
+      to_remove <- collinarity_check(data_tot, all_variables, variable_chosen = step8[[1]])
       step_variables <- step_variables[!step_variables %in% to_remove]
       
       # run step 9 of forward selection process
@@ -265,7 +268,6 @@ dir.create("outputs/multivar/temp")
 # run final multivariable model
 final_model<- run_final_model(data=data_tot, graph=GRAPH, pathogen=pathogen) 
       # this function includes the variables from the paper
-      # year number in the model comes from data_tot -> needs updating if you filter the data to run on a subset of years rather than the full timeseries
 beep()
 summary(final_model)
 
@@ -273,15 +275,15 @@ saveRDS(final_model, paste0("outputs/", pathogen, "_final_model.RDS"))
 
 
 ### random effect plots
-plotting_RE_week_number(model=final_model, data=data_tot, pathogen=pathogen)
+plotting_RE_week_number(model = final_model, data = data_tot, pathogen = pathogen)
 
-plotting_RE_municip(model=final_model, data=data_tot, shapefile = shapefile) 
+plotting_RE_municip(model = final_model, data = data_tot, shapefile = shapefile) 
 
     
 ### sampling
 n <- 1000
-index=1:nrow(data_tot)
-samples <- sampling_models(model=final_model, index=index, nsamp=n)
+index <- 1:nrow(data_tot)
+samples <- sampling_models(model = final_model, index = index, nsamp = n)
 beep()
 saveRDS(samples, paste0("outputs/samples_", pathogen, ".RDS"))
 
@@ -300,14 +302,14 @@ plot_map_MAE(data=data_tot, model=final_model, pathogen=pathogen, shapefile=shap
 ########################## Sensitivity analysis ####################################
 ####################################################################################
 
-response <-"exp_resid" 
+data_type <-"exp_resid" 
       # response must be report, exp_report, resid, or exp_resid - main analysis used exp_resid
       # report = municipality where a case was reported
       # resid = municipality where the person reporting a case lives
       # exp_report = municipality where a case was suspected infected (where this information is available), and otherwise report
       # exp_resid = municipality where a case was suspected infected (where this information is available), and otherwise resid 
 
-data_sens <- readRDS(paste0("data/", pathogen,"_",response,".RDS"))
+data_sens <- readRDS(paste0("data/", pathogen,"_", data_type,".RDS"))
 data_sens <- data_processing(data_sens)
 
 sensitivity <- run_final_model(data=data_sens, graph=GRAPH, pathogen=pathogen)
