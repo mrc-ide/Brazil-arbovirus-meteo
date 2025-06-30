@@ -4,28 +4,28 @@ run_univar_analysis <- function(data, variables, save_progress=TRUE, pathogen){
   
   options(mc.cores = parallel::detectCores())
   
-  list<-list()
-  models<-list()
+  list <- list()
+  models <- list()
   var_names <- variables
   
-  graph<-inla.read.graph(GRAPH)
+  graph <- inla.read.graph(GRAPH)
   
   for(i in 1:length(var_names)){
     
     if(var_names[i] %in% c("flood_0","flood_1","flood_2" ,"flood_3","flood_01","flood_02",           
                            "flood_03")){ # categorical variable
-      formula <- CASES ~ 1 + lag_cases + 
+      formula <- CASES ~ 1 + lag_log_cases + 
         f(WEEK_NO, replicate=STATE_NO, model="rw1", 
-          cyclic=T) + 
+          cyclic=TRUE) + 
         f(GEOM, model="bym2", 
           graph=graph, 
           replicate=YEAR_NO)+
         f(data[,var_names[i]],model="iid")
     
     }else{
-      formula <- CASES ~ 1 + lag_cases + 
+      formula <- CASES ~ 1 + lag_log_cases + 
         f(WEEK_NO, replicate=STATE_NO, model="rw1", 
-          cyclic=T) + 
+          cyclic=TRUE) + 
         f(GEOM, model="bym2", 
           graph=graph, 
           replicate=YEAR_NO)+
@@ -39,8 +39,8 @@ run_univar_analysis <- function(data, variables, save_progress=TRUE, pathogen){
                         control.family=list(link='log'),
                         control.compute = list(waic = TRUE),
                         control.inla=list(int.strategy = "eb"), 
-                        verbose = F,
-                        safe=T)
+                        verbose = FALSE,
+                        safe = TRUE)
     
     waic<- models[[i]]$waic$waic
     beta<-models[[i]]$summary.fixed[3,]
@@ -55,7 +55,7 @@ run_univar_analysis <- function(data, variables, save_progress=TRUE, pathogen){
   }
   result<- bind_rows(list)
   
-  if(save_progress==TRUE){
+  if(save_progress){
    saveRDS(result, paste0("outputs/univar/temp/",pathogen,"_", i,".RDS")) 
   }
   return(result)
@@ -67,13 +67,13 @@ run_univar_analysis <- function(data, variables, save_progress=TRUE, pathogen){
 binding_univar_results <-function(pathogen, file_path="outputs/univar/temp/"){
   filenames <- list.files(file_path, pattern=pathogen, full.names=TRUE)
   ldf <- lapply(filenames, readRDS)
-  my.fcn<-function(x){
+  my.fcn <- function(x){
     ifelse("cat" %in% colnames(x),x$cat<-as.character(x$cat), x$cat<-NA)
     return(x)
   }
   test<-lapply(ldf,my.fcn)
   res<- bind_rows(test, id=NULL)
-  res<- res[duplicated(res$var)==F,]
+  res<- res[!duplicated(res$var),]
 
   res <- process_univar_names(res)
   
@@ -83,8 +83,8 @@ binding_univar_results <-function(pathogen, file_path="outputs/univar/temp/"){
 
 ## choose the best univariable model
 best_univar <- function(univar_results_table){
-  univar_results_table %>%filter(beta_low < 0 & beta_upp <0 | beta_low > 0 & beta_upp >0)->sig
-  sig$var[sig$waic==min(sig$waic)] ->var
+  univar_results_table %>% filter(beta_low < 0 & beta_upp <0 | beta_low > 0 & beta_upp >0) -> sig
+  sig$var[sig$waic==min(sig$waic)] -> var
   waic<-min(sig$waic)
   return(c(var,waic))
 }
@@ -100,15 +100,8 @@ plot_univar_betas <- function(choice = "temperature"){
   data <- process_univar_results_for_plot()
   
   if(choice=="temperature"){
-  plots<-list()
-  sub_tot<-data[data$group=="Absolute minimum temp" |data$group=="Absolute maximum temp"|data$group=="Absolute minimum temp"|
-                  data$group=="min temp"|data$group=="mean temp"|data$group=="max temp" |
-                  data$group=="temp range",]
-  sub_tot$group <- sub("temp", "temperature", sub_tot$group)
-  sub_tot$group <- sub("min temperature", "Minimum temperature", sub_tot$group)
-  sub_tot$group <- sub("mean temperature", "Mean temperature", sub_tot$group)
-  sub_tot$group <- sub("max temperature", "Maximum temperature", sub_tot$group)
-  sub_tot$group <- sub("temperature range", "Temperature range", sub_tot$group)
+  plots <- list()
+  sub_tot <- data |> filter(str_detect(group, "Tmin") | str_detect(group, "Tmax") | str_detect(group, "TR"))
   
   for(i in 1:length(unique(sub_tot$group))){
     sub<-sub_tot[sub_tot$group == unique(sub_tot$group)[i],]
@@ -131,47 +124,34 @@ plot_univar_betas <- function(choice = "temperature"){
             plot.margin = margin(10, 12, 10, 10))#, 
     
   }
-  plot1<-sjPlot::plot_grid(plots)
+  plot1 <- sjPlot::plot_grid(plots)
   
   return(plot1)
   }
   
   if(choice=="non_temperature"){
     
-    data$group2<-data$group
-    new<-data[data$group2 !="min temp"&
-        data$group2 !="mean temp"&
-        data$group2 != "max temp"&
-        data$group2 !="Absolute maximum temp"& 
-        data$group2 !="Absolute minimum temp"&
-        data$group2 !="temp range",]
+    data$group2 <- data$group
+    new <- data |> filter(!str_detect(group2, "Tmin") & !str_detect(group2, "Tmax") & !str_detect(group, "TR"))
     
-    new$group2 <- sub("hum", "humidity", new$group2)
-    new$group2 <- sub("min humidity", "Minimum humidity", new$group2)
-    new$group2 <- sub("mean humidity", "Mean humidity", new$group2)
-    new$group2 <- sub("max humidity", "Maximum humidity", new$group2)
-    new$group2[new$group2=="mean rain"]<-"Mean rain"
-    new$group2[new$group2=="cumulative rain"]<-"Cumulative rain"
     new$group2[new$group2=="income"|new$group2=="illiteracy"|new$group2=="sanitation"]<-"Socioeconomic"
-    new$group2[new$group2=="consecutive rain"]<-"Consecutive days of rain"
-    new$group2[new$group2=="consecutive dry"]<-"Consecutive days of no rain"
-    new$group2[new$group2=="flooding"]<-"Flooding"
+    new$group2[new$group2=="raindays cons"]<-"Consecutive days of rain"
+    new$group2[new$group2=="drydays cons"]<-"Consecutive days of no rain"
     new$group2[new$group2=="MIR"]<-"Land use"
     new$group2[new$group2=="raindays"]<-"Days of rain"
-    new$group2[new$group2=="very heavy raindays"]<-"Days of very heavy rain"
-    new$group2[new$group2=="heavy raindays"]<-"Days of heavy rain"
-    new$group2[new$var=="Between centrality"]<-"Human connectivity:\nbetweenness centrality"
-    new$group2[new$var=="Alpha centrality"]<-"Human connectivity:\nalpha centrality"
-    new$group2[new$var=="Degree centrality"]<-"Human connectivity:\ndegree centrality"
-    
+    new$group2[new$group2=="raindays heavy+"]<-"Days of very heavy rain"
+    new$group2[new$group2=="raindays heavy"]<-"Days of heavy rain"
+    new$group2[new$var=="cent_between"]<-"Human connectivity:\nbetweenness centrality"
+    new$group2[new$var=="cent_alpha"]<-"Human connectivity:\nalpha centrality"
+    new$group2[new$var=="cent_degree"]<-"Human connectivity:\ndegree centrality"
     
     plots2<-list()
     for(i in 1:length(unique(new$group2))){
       sub<-new[new$group2 == unique(new$group2)[i],]
-      lim1<- ifelse(min(sub$beta_low,na.rm=T)< -max(sub$beta_upp,na.rm=T),
-                    min(sub$beta_low,na.rm=T), - max(sub$beta_upp,na.rm=T))
-      lim2<-ifelse(min(sub$beta_low,na.rm=T)< -max(sub$beta_upp,na.rm=T),
-                   - min(sub$beta_low,na.rm=T), max(sub$beta_upp,na.rm=T))
+      lim1<- ifelse(min(sub$beta_low,na.rm=TRUE)< -max(sub$beta_upp,na.rm=TRUE),
+                    min(sub$beta_low,na.rm=TRUE), - max(sub$beta_upp,na.rm=TRUE))
+      lim2<-ifelse(min(sub$beta_low,na.rm=TRUE)< -max(sub$beta_upp,na.rm=TRUE),
+                   - min(sub$beta_low,na.rm=TRUE), max(sub$beta_upp,na.rm=TRUE))
       
       plots2[[i]]<-
         ggplot(sub)+ 

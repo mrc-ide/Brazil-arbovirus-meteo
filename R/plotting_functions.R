@@ -4,11 +4,11 @@
 ## data visualisation
 
 ## temporal heterogeneity - average cases per week number per state
-temporal_cases_state <- function(){
+temporal_cases_state <- function(data_type){
 list<-list()
 for(i in 1:3){
   path<-unique(c("zikv","chikv", "denv"))[i]
-  df<-readRDS(paste0("data/", path,"_exp_resid.RDS"))
+  df<-readRDS(paste0("data/", path, "_", data_type,".RDS"))
   df |> mutate(Inc = ((CASES+1e-05)/pop)*100000) -> df
   df |> select(STATE,WEEK_NO,CASES,YEAR, Inc) |> 
     group_by(STATE,WEEK_NO) |>
@@ -24,7 +24,7 @@ GRID <- br_states_grid1
 combo$path <-toupper(combo$path)
 combo <- combo[combo$WEEK_NO<53,]
 
-week_RE<-ggplot(combo) + facet_geo(facets = "STATE", 
+week_RE <- ggplot(combo) + facet_geo(facets = "STATE", 
                                    grid = br_states_grid1,scales="free")+
   geom_line(aes(x = WEEK_NO, y = log(Inc), col = path), linewidth=1) +
   xlab("\nWeek number\n") +
@@ -49,12 +49,12 @@ return(week_RE)
 
 
 ## spatial heterogeneity - average cases municipality
-spatial_cases_municip <- function(){
+spatial_cases_municip <- function(data_type){
 list<-list()
 for(i in 1:3){
   path<-unique(c("zikv","chikv", "denv"))[i]
   
-  df<-readRDS(paste0("data/", path,"_exp_resid.RDS"))
+  df<-readRDS(paste0("data/", path, "_", data_type,".RDS"))
   df |> mutate(Inc = ((CASES+1e-05)/pop)*100000) -> df
   
   df |> select(STATE,MUNICIP,WEEK_NO,CASES,YEAR, Inc) |>
@@ -93,27 +93,22 @@ return(space)
 
 
 ## spatiotemporal heterogeneity - heatmaps
-heatmaps <- function(shapefile = shapefile, pathogen = "denv"){
+heatmaps <- function(shapefile = shapefile, pathogen = "denv", data_type = "exp_resid"){
   
   if(pathogen!="denv" & pathogen !="zikv"& pathogen !="chikv"){
     warning("pathogen must be chikv, denv, or zikv")
   }
   
-  df<-readRDS(paste0("data/", pathogen,"_exp_resid.RDS"))
-  geom <- data.frame(MUNICIP=shapefile$code_muni, GEOM=1:length(unique(shapefile$code_muni)))
-  df |> left_join(geom)-> df
+  df <- readRDS(paste0("data/", pathogen, "_", data_type,".RDS"))
   df$WEEK <- (paste0(df$YEAR,"-W",sprintf("%02d",(df$WEEK_NO)),"-1"))
   df |> select(MUNICIP, WEEK, CASES, pop, GEOM, YEAR) |> mutate(Inc = ((CASES+1e-05)/pop)*100000) -> df
   
-  y <- shapefile$code_muni
-  z <- shapefile$name_muni
-  x <- shapefile$abbrev_state
-  cent<-st_centroid(shapefile)
+  cent <- st_centroid(shapefile)
   cent.coords <- st_coordinates(cent)
-  y <- data.frame(MUNICIP = y, 
-                  NAME=z, 
-                  x =cent.coords[,1],
-                  y=cent.coords[,2])
+  y <- data.frame(MUNICIP = shapefile$code_muni, 
+                  NAME = shapefile$name_muni, 
+                  x = cent.coords[,1],
+                  y = cent.coords[,2])
   y$order <- 1:nrow(y)
   
   df$logInc <- log(df$Inc)
@@ -122,7 +117,7 @@ heatmaps <- function(shapefile = shapefile, pathogen = "denv"){
   
   # geom
   zD <- merge(y, df, by = "MUNICIP", all.x = F, all.y = F)
-    zD <- zD[order(zD$x), ]# ordering geographically
+    zD <- zD[order(zD$x), ] # ordering geographically
     zD$MUNICIP<-as.character(zD$MUNICIP)
     zD <- zD |>
       mutate(MUNICIP = fct_reorder(MUNICIP, desc(x))) 
@@ -161,7 +156,7 @@ return(plot)
 
 
 ## plotting multivariable model random effects - temporal 
-plotting_RE_week_number<-function(model, data, pathogen){
+plotting_RE_week_number <- function(model, data, pathogen){
   
     random <- model$summary.random$WEEK_NO
     colnames(random) <- c("ID","mean","sd", "quant2.5", "0.5quant" ,  "quant97.5", "mode", "kld"   )
@@ -201,7 +196,7 @@ plotting_RE_week_number<-function(model, data, pathogen){
 }
 
 ## plotting multivariable model random effects - spatial 
-plotting_RE_municip <- function(model,data,shapefile){
+plotting_RE_municip <- function(model, data, shapefile){
   
   FILTER<-unique(data$MUNICIP)
   
