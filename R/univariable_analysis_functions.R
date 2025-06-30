@@ -93,16 +93,25 @@ best_univar <- function(univar_results_table){
 ## plot univariable beta results
 plot_univar_betas <- function(choice = "temperature"){
   
-  if(choice!="temperature" & choice !="non_temperature"){
-    warning("choice must be temperature or non_temperature")
+  if(choice!="temperature" & choice !="humidity" & choice !="rain" & choice !="socioeconomic"){
+    warning("choice must be temperature or humidity or rain or socioeconomic")
   }
   
   data <- process_univar_results_for_plot()
+  plots <- list()
   
   if(choice=="temperature"){
-  plots <- list()
-  sub_tot <- data |> filter(str_detect(group, "Tmin") | str_detect(group, "Tmax") | str_detect(group, "TR"))
-  
+  sub_tot <- data |> filter(str_detect(group, "Tmin") | str_detect(group, "Tmax") | str_detect(group, "Tmean") | str_detect(group, "TR"))
+  }
+  if(choice=="humidity"){
+  sub_tot <- data |> filter(str_detect(group, "RH"))
+  }
+  if(choice=="rain"){
+  sub_tot <- data |> filter(str_detect(group, "rf") | str_detect(group, "SPEI") | str_detect(group, "ENSO") | str_detect(group, "days"))
+  }
+  if(choice=="socioeconomic"){
+    sub_tot <- data |> filter(str_detect(group, "cent") | str_detect(group, "sanitation") | str_detect(group, "income") | str_detect(group, "illiteracy"))
+  }
   for(i in 1:length(unique(sub_tot$group))){
     sub<-sub_tot[sub_tot$group == unique(sub_tot$group)[i],]
     lim1<- ifelse(min(sub$beta_low)< -max(sub$beta_upp),
@@ -127,52 +136,4 @@ plot_univar_betas <- function(choice = "temperature"){
   plot1 <- sjPlot::plot_grid(plots)
   
   return(plot1)
-  }
-  
-  if(choice=="non_temperature"){
-    
-    data$group2 <- data$group
-    new <- data |> filter(!str_detect(group2, "Tmin") & !str_detect(group2, "Tmax") & !str_detect(group, "TR"))
-    
-    new$group2[new$group2=="income"|new$group2=="illiteracy"|new$group2=="sanitation"]<-"Socioeconomic"
-    new$group2[new$group2=="raindays cons"]<-"Consecutive days of rain"
-    new$group2[new$group2=="drydays cons"]<-"Consecutive days of no rain"
-    new$group2[new$group2=="MIR"]<-"Land use"
-    new$group2[new$group2=="raindays"]<-"Days of rain"
-    new$group2[new$group2=="raindays heavy+"]<-"Days of very heavy rain"
-    new$group2[new$group2=="raindays heavy"]<-"Days of heavy rain"
-    new$group2[new$var=="cent_between"]<-"Human connectivity:\nbetweenness centrality"
-    new$group2[new$var=="cent_alpha"]<-"Human connectivity:\nalpha centrality"
-    new$group2[new$var=="cent_degree"]<-"Human connectivity:\ndegree centrality"
-    
-    plots2<-list()
-    for(i in 1:length(unique(new$group2))){
-      sub<-new[new$group2 == unique(new$group2)[i],]
-      lim1<- ifelse(min(sub$beta_low,na.rm=TRUE)< -max(sub$beta_upp,na.rm=TRUE),
-                    min(sub$beta_low,na.rm=TRUE), - max(sub$beta_upp,na.rm=TRUE))
-      lim2<-ifelse(min(sub$beta_low,na.rm=TRUE)< -max(sub$beta_upp,na.rm=TRUE),
-                   - min(sub$beta_low,na.rm=TRUE), max(sub$beta_upp,na.rm=TRUE))
-      
-      plots2[[i]]<-
-        ggplot(sub)+ 
-        geom_hline(aes(yintercept = 0), linetype="dashed") +
-        geom_point(aes(x=var, y=beta_mean, col=path), 
-                   size=2,position=position_dodge(width=0.2)) +
-        geom_pointrange(aes(x=var, y=beta_mean, 
-                            ymin=beta_low, 
-                            ymax=beta_upp, col=path), 
-                        size=0.3,position=position_dodge(width=0.2)) + 
-        labs(x = NULL,
-             y = "Beta value", title = unique(new$group2)[i]) +
-        coord_flip(ylim=c(lim1,lim2)) + #makes horizontal
-        theme_classic() +
-        theme(legend.title=element_blank(),#legend.position="none",
-              plot.title = element_text(hjust=0.5))
-    }
-    
-    
-    plot2<- sjPlot::plot_grid(plots2)
-    
-    return(plot2)
-  }
   }
