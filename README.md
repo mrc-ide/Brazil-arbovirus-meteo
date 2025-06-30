@@ -6,7 +6,7 @@ This repository contains code to recreate the spatiotemporal regression modellin
 All analyses can be run from the main.R file, which calls scripts with functions to run the analysis (contained in the R folder). 
 
 ## Data
-You need to download the data separately from Zenodo and save in the data folder. Please cite both the paper and the data if including them in your work. 
+You need to download the data separately from Zenodo (doi 10.5281/zenodo.13286671) and save in the data folder. Please cite both the paper and the data if including them in your work. 
 
 Key for how the municipality was assigned to a case in the data files:
 
